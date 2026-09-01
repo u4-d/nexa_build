@@ -1,0 +1,475 @@
+name: Build Nexa
+
+
+# ============================================================
+# Workflow Trigger
+# ============================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example: v1.0.0"
+        required: true
+        default: "v1.0.0"
+
+
+# ============================================================
+# Default permissions
+# ============================================================
+
+permissions:
+  contents: read
+
+
+jobs:
+
+  # ==========================================================
+  # Build Matrix
+  # ==========================================================
+
+  build:
+
+    name: ${{ matrix.target }}
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+
+          # --------------------------------------------------
+          # Dart CLI
+          # --------------------------------------------------
+
+          - target: actions-linux
+            os: ubuntu-latest
+
+          - target: actions-windows
+            os: windows-latest
+
+
+          # --------------------------------------------------
+          # Flutter Desktop
+          # --------------------------------------------------
+
+          - target: commander-linux
+            os: ubuntu-latest
+
+          - target: commander-windows
+            os: windows-latest
+
+
+          # --------------------------------------------------
+          # Flutter Android
+          # --------------------------------------------------
+
+          - target: commander-android
+            os: ubuntu-latest
+
+
+    runs-on: ${{ matrix.os }}
+
+
+    steps:
+
+      # ======================================================
+      # 1. Checkout private nexa
+      # ======================================================
+
+      - name: Checkout private nexa
+        uses: actions/checkout@v4
+        with:
+          repository: u4-d/nexa
+          token: ${{ secrets.NEXA_PAT }}
+          path: nexa
+          fetch-depth: 1
+
+
+      # ======================================================
+      # 2. Setup Flutter
+      #    Only needed for nexa_commander
+      # ======================================================
+
+      - name: Setup Flutter
+        if: startsWith(matrix.target, 'commander-')
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+
+      # ======================================================
+      # 3. Setup Python
+      #    Only needed for Windows actions
+      # ======================================================
+
+      - name: Setup Python
+        if: matrix.target == 'actions-windows'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+
+      # ======================================================
+      # 4. Cache pip
+      # ======================================================
+
+      - name: Cache pip
+        if: matrix.target == 'actions-windows'
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-pyinstaller-v1
+
+
+      # ======================================================
+      # 5. Install Python build dependencies
+      # ======================================================
+
+      - name: Install Python dependencies
+        if: matrix.target == 'actions-windows'
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pandas xlrd pyinstaller
+
+
+      # ======================================================
+      # 6. Install Dart / Flutter workspace dependencies
+      # ======================================================
+      #
+      # nexa is a Dart Workspace.
+      #
+      # Do NOT create pubspec_overrides.yaml here.
+      # The workspace root already defines all local packages.
+      #
+      # ======================================================
+
+      - name: Install workspace dependencies
+        if: matrix.target == 'actions-linux' || matrix.target == 'actions-windows'
+        working-directory: nexa
+        run: |
+          dart pub get
+
+
+      - name: Install Flutter workspace dependencies
+        if: startsWith(matrix.target, 'commander-')
+        working-directory: nexa
+        run: |
+          flutter pub get
+
+
+      # ======================================================
+      # 7. Build actions - Linux
+      # ======================================================
+
+      - name: Build actions Linux
+        if: matrix.target == 'actions-linux'
+        working-directory: nexa
+        run: |
+          dart compile exe actions/bin/actions.dart \
+            -o ../actions-linux
+
+
+      # ======================================================
+      # 8. Build actions - Windows
+      # ======================================================
+
+      - name: Build actions Windows
+        if: matrix.target == 'actions-windows'
+        working-directory: nexa
+        shell: pwsh
+        run: |
+          dart compile exe actions/bin/actions.dart `
+            -o ..\actions-windows.exe
+
+
+      # ======================================================
+      # 9. Build convert_xls_to_csv.exe
+      # ======================================================
+
+      - name: Build convert_xls_to_csv.exe
+        if: matrix.target == 'actions-windows'
+        working-directory: nexa
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --onefile `
+            --name convert_xls_to_csv `
+            convert_xls_to_csv.py
+
+          Copy-Item `
+            dist\convert_xls_to_csv.exe `
+            ..\convert_xls_to_csv.exe
+
+
+      # ======================================================
+      # 10. Build nexa_commander - Linux
+      # ======================================================
+
+      - name: Build nexa_commander Linux
+        if: matrix.target == 'commander-linux'
+        working-directory: nexa/nexa_commander
+        run: |
+          flutter build linux --release
+
+
+      # ======================================================
+      # 11. Build nexa_commander - Windows
+      # ======================================================
+
+      - name: Build nexa_commander Windows
+      # ======================================================
+        if: matrix.target == 'commander-windows'
+        working-directory: nexa/nexa_commander
+        run: |
+          flutter build windows --release
+
+
+      # ======================================================
+      # 12. Build nexa_commander - Android
+      # ======================================================
+
+      - name: Build nexa_commander Android
+        if: matrix.target == 'commander-android'
+        working-directory: nexa/nexa_commander
+        run: |
+          flutter build apk --release
+
+
+      # ======================================================
+      # 13. Prepare actions Linux artifact
+      # ======================================================
+
+      - name: Prepare actions Linux artifact
+        if: matrix.target == 'actions-linux'
+        run: |
+          mkdir -p artifact/linux
+
+          cp \
+            actions-linux \
+            artifact/linux/actions
+
+
+      # ======================================================
+      # 14. Prepare actions Windows artifact
+      # ======================================================
+
+      - name: Prepare actions Windows artifact
+        if: matrix.target == 'actions-windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force `
+            artifact\windows
+
+          Copy-Item `
+            actions-windows.exe `
+            artifact\windows\actions.exe
+
+          Copy-Item `
+            convert_xls_to_csv.exe `
+            artifact\windows\convert_xls_to_csv.exe
+
+
+      # ======================================================
+      # 15. Prepare commander Linux artifact
+      # ======================================================
+
+      - name: Prepare commander Linux artifact
+        if: matrix.target == 'commander-linux'
+        run: |
+          mkdir -p artifact/linux/nexa_commander
+
+          cp -R \
+            nexa/nexa_commander/build/linux/x64/release/bundle/* \
+            artifact/linux/nexa_commander/
+
+
+      # ======================================================
+      # 16. Prepare commander Windows artifact
+      # ======================================================
+
+      - name: Prepare commander Windows artifact
+        if: matrix.target == 'commander-windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force `
+            artifact\windows\nexa_commander
+
+          Copy-Item `
+            nexa\nexa_commander\build\windows\x64\runner\Release\* `
+            artifact\windows\nexa_commander\ `
+            -Recurse
+
+
+      # ======================================================
+      # 17. Prepare commander Android artifact
+      # ======================================================
+
+      - name: Prepare commander Android artifact
+        if: matrix.target == 'commander-android'
+        run: |
+          mkdir -p artifact/android
+
+          cp \
+            nexa/nexa_commander/build/app/outputs/flutter-apk/app-release.apk \
+            artifact/android/nexa-commander.apk
+
+
+      # ======================================================
+      # 18. Upload Matrix artifact
+      # ======================================================
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: artifact
+          retention-days: 1
+
+
+  # ==========================================================
+  # Package
+  # ==========================================================
+
+  package:
+
+    name: Package Release
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+
+    steps:
+
+      # ======================================================
+      # 19. Download all Matrix artifacts
+      # ======================================================
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+
+      # ======================================================
+      # 20. Display artifact structure
+      # ======================================================
+
+      - name: Show artifact structure
+        run: |
+          echo "===== Artifacts ====="
+          find artifacts -print | sort
+
+
+      # ======================================================
+      # 21. Create release directories
+      # ======================================================
+
+      - name: Prepare release directories
+        run: |
+          mkdir -p release/nexa-actions
+          mkdir -p release/nexa-commander
+
+
+      # ======================================================
+      # 22. Assemble nexa-actions
+      # ======================================================
+
+      - name: Assemble nexa-actions
+        run: |
+
+          mkdir -p release/nexa-actions/linux
+          mkdir -p release/nexa-actions/windows
+
+          cp \
+            artifacts/actions-linux/linux/actions \
+            release/nexa-actions/linux/actions
+
+          cp \
+            artifacts/actions-windows/windows/actions.exe \
+            release/nexa-actions/windows/actions.exe
+
+          cp \
+            artifacts/actions-windows/windows/convert_xls_to_csv.exe \
+            release/nexa-actions/windows/convert_xls_to_csv.exe
+
+
+      # ======================================================
+      # 23. Assemble nexa-commander
+      # ======================================================
+
+      - name: Assemble nexa-commander
+        run: |
+
+          mkdir -p release/nexa-commander/linux
+          mkdir -p release/nexa-commander/windows
+          mkdir -p release/nexa-commander/android
+
+          cp -R \
+            artifacts/commander-linux/linux/nexa_commander \
+            release/nexa-commander/linux/
+
+          cp -R \
+            artifacts/commander-windows/windows/nexa_commander \
+            release/nexa-commander/windows/
+
+          cp \
+            artifacts/commander-android/android/nexa-commander.apk \
+            release/nexa-commander/android/nexa-commander.apk
+
+
+      # ======================================================
+      # 24. Show final release structure
+      # ======================================================
+
+      - name: Show final release structure
+        run: |
+          echo "===== Final Release ====="
+          find release -print | sort
+
+
+      # ======================================================
+      # 25. Create nexa-actions.zip
+      # ======================================================
+
+      - name: Create nexa-actions.zip
+        run: |
+          cd release
+
+          zip -r \
+            ../nexa-actions.zip \
+            nexa-actions
+
+
+      # ======================================================
+      # 26. Create nexa-commander.zip
+      # ======================================================
+
+      - name: Create nexa-commander.zip
+        run: |
+          cd release
+
+          zip -r \
+            ../nexa-commander.zip \
+            nexa-commander
+
+
+      # ======================================================
+      # 27. Create GitHub Release
+      # ======================================================
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version }}
+          name: Nexa ${{ inputs.version }}
+          generate_release_notes: true
+          files: |
+            nexa-actions.zip
+            nexa-commander.zip

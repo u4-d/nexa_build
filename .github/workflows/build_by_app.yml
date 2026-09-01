@@ -1,0 +1,441 @@
+name: Build Nexa
+
+on:
+  workflow_dispatch:
+
+# 默认只读
+permissions:
+  contents: read
+
+
+jobs:
+
+  # ============================================================
+  # Build Matrix
+  # ============================================================
+
+  build:
+
+    name: ${{ matrix.target }}
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+
+          # ----------------------------------------------------
+          # Dart CLI
+          # ----------------------------------------------------
+
+          - target: actions-linux
+            os: ubuntu-latest
+
+          - target: actions-windows
+            os: windows-latest
+
+
+          # ----------------------------------------------------
+          # Flutter Desktop
+          # ----------------------------------------------------
+
+          - target: commander-linux
+            os: ubuntu-latest
+
+          - target: commander-windows
+            os: windows-latest
+
+
+          # ----------------------------------------------------
+          # Flutter Android
+          # ----------------------------------------------------
+
+          - target: commander-android
+            os: ubuntu-latest
+
+
+    runs-on: ${{ matrix.os }}
+
+
+    steps:
+
+      # ========================================================
+      # 1. GitHub App authentication
+      # ========================================================
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: u4-d
+          repositories: nexa
+
+
+      # ========================================================
+      # 2. Checkout private nexa
+      # ========================================================
+
+      - name: Checkout nexa
+        uses: actions/checkout@v4
+        with:
+          repository: u4-d/nexa
+          token: ${{ steps.app-token.outputs.token }}
+          path: nexa
+          fetch-depth: 1
+
+
+      # ========================================================
+      # 3. Setup Flutter
+      #    Only needed by commander
+      # ========================================================
+
+      - name: Setup Flutter
+        if: startsWith(matrix.target, 'commander-')
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+
+      # ========================================================
+      # 4. Setup Python
+      #    Only needed by Windows actions
+      # ========================================================
+
+      - name: Setup Python
+        if: matrix.target == 'actions-windows'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+
+      # ========================================================
+      # 5. Cache Python packages
+      # ========================================================
+
+      - name: Cache pip
+        if: matrix.target == 'actions-windows'
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-pyinstaller
+
+
+      # ========================================================
+      # 6. Install Python build dependencies
+      # ========================================================
+
+      - name: Install Python dependencies
+        if: matrix.target == 'actions-windows'
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas xlrd pyinstaller
+
+
+      # ========================================================
+      # 7. Build actions - Linux
+      # ========================================================
+
+      - name: Build actions Linux
+        if: matrix.target == 'actions-linux'
+        working-directory: nexa/actions
+        run: |
+          dart pub get
+          dart compile exe bin/actions.dart \
+            -o ../../actions-linux
+
+
+      # ========================================================
+      # 8. Build actions - Windows
+      # ========================================================
+
+      - name: Build actions Windows
+        if: matrix.target == 'actions-windows'
+        working-directory: nexa/actions
+        shell: pwsh
+        run: |
+          dart pub get
+
+          dart compile exe bin/actions.dart `
+            -o ..\..\actions-windows.exe
+
+
+      # ========================================================
+      # 9. Build convert_xls_to_csv.exe
+      # ========================================================
+
+      - name: Build convert_xls_to_csv.exe
+        if: matrix.target == 'actions-windows'
+        working-directory: nexa
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --onefile `
+            --name convert_xls_to_csv `
+            convert_xls_to_csv.py
+
+          Copy-Item `
+            dist\convert_xls_to_csv.exe `
+            ..\convert_xls_to_csv.exe
+
+
+      # ========================================================
+      # 10. Build commander Linux
+      # ========================================================
+
+      - name: Build commander Linux
+        if: matrix.target == 'commander-linux'
+        working-directory: nexa/nexa_commander
+        run: |
+          flutter pub get
+          flutter build linux --release
+
+
+      # ========================================================
+      # 11. Build commander Windows
+      # ========================================================
+
+      - name: Build commander Windows
+        if: matrix.target == 'commander-windows'
+        working-directory: nexa/nexa_commander
+        run: |
+          flutter pub get
+          flutter build windows --release
+
+
+      # ========================================================
+      # 12. Build commander Android
+      # ========================================================
+
+      - name: Build commander Android
+        if: matrix.target == 'commander-android'
+        working-directory: nexa/nexa_commander
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+
+      # ========================================================
+      # 13. Prepare artifact - actions Linux
+      # ========================================================
+
+      - name: Prepare actions Linux
+        if: matrix.target == 'actions-linux'
+        run: |
+          mkdir -p artifact/linux
+          cp actions-linux artifact/linux/actions
+
+
+      # ========================================================
+      # 14. Prepare artifact - actions Windows
+      # ========================================================
+
+      - name: Prepare actions Windows
+        if: matrix.target == 'actions-windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force `
+            artifact\windows
+
+          Copy-Item `
+            actions-windows.exe `
+            artifact\windows\actions.exe
+
+          Copy-Item `
+            convert_xls_to_csv.exe `
+            artifact\windows\convert_xls_to_csv.exe
+
+
+      # ========================================================
+      # 15. Prepare commander Linux
+      # ========================================================
+
+      - name: Prepare commander Linux
+        if: matrix.target == 'commander-linux'
+        run: |
+          mkdir -p artifact/linux/nexa_commander
+
+          cp -R \
+            nexa/nexa_commander/build/linux/x64/release/bundle/* \
+            artifact/linux/nexa_commander/
+
+
+      # ========================================================
+      # 16. Prepare commander Windows
+      # ========================================================
+
+      - name: Prepare commander Windows
+        if: matrix.target == 'commander-windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force `
+            artifact\windows\nexa_commander
+
+          Copy-Item `
+            nexa\nexa_commander\build\windows\x64\runner\Release\* `
+            artifact\windows\nexa_commander\ `
+            -Recurse
+
+
+      # ========================================================
+      # 17. Prepare commander Android
+      # ========================================================
+
+      - name: Prepare commander Android
+        if: matrix.target == 'commander-android'
+        run: |
+          mkdir -p artifact/android
+
+          cp \
+            nexa/nexa_commander/build/app/outputs/flutter-apk/app-release.apk \
+            artifact/android/nexa-commander.apk
+
+
+      # ========================================================
+      # 18. Upload artifact
+      # ========================================================
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: artifact/
+          retention-days: 1
+
+
+  # ============================================================
+  # Package Release
+  # ============================================================
+
+  package:
+
+    name: Package Release
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+
+    steps:
+
+      # ========================================================
+      # Download all Matrix artifacts
+      # ========================================================
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+
+      # ========================================================
+      # Show structure
+      # ========================================================
+
+      - name: Show artifacts
+        run: |
+          find artifacts -type f -o -type d | sort
+
+
+      # ========================================================
+      # Build final directory
+      # ========================================================
+
+      - name: Prepare release directories
+        run: |
+          mkdir -p release/actions
+          mkdir -p release/commander
+
+
+      # ========================================================
+      # Actions
+      # ========================================================
+
+      - name: Assemble actions
+        run: |
+
+          mkdir -p release/actions/linux
+          mkdir -p release/actions/windows
+
+          cp \
+            artifacts/actions-linux/linux/actions \
+            release/actions/linux/actions
+
+          cp \
+            artifacts/actions-windows/windows/actions.exe \
+            release/actions/windows/actions.exe
+
+          cp \
+            artifacts/actions-windows/windows/convert_xls_to_csv.exe \
+            release/actions/windows/convert_xls_to_csv.exe
+
+
+      # ========================================================
+      # Commander
+      # ========================================================
+
+      - name: Assemble commander
+        run: |
+
+          mkdir -p release/commander/linux
+          mkdir -p release/commander/windows
+          mkdir -p release/commander/android
+
+          cp -R \
+            artifacts/commander-linux/linux/nexa_commander \
+            release/commander/linux/
+
+          cp -R \
+            artifacts/commander-windows/windows/nexa_commander \
+            release/commander/windows/
+
+          cp \
+            artifacts/commander-android/android/nexa-commander.apk \
+            release/commander/android/
+
+
+      # ========================================================
+      # Create ZIP
+      # ========================================================
+
+      - name: Create nexa-actions.zip
+        run: |
+          cd release
+          zip -r ../nexa-actions.zip actions
+
+
+      - name: Create nexa-commander.zip
+        run: |
+          cd release
+          zip -r ../nexa-commander.zip commander
+
+
+      # ========================================================
+      # Generate Release tag
+      # ========================================================
+
+      - name: Generate release tag
+        id: release
+        run: |
+          echo "tag=v$(date +'%Y.%m.%d.%H%M')" >> "$GITHUB_OUTPUT"
+
+
+      # ========================================================
+      # Create GitHub Release
+      # ========================================================
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: Nexa ${{ steps.release.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            nexa-actions.zip
+            nexa-commander.zip
