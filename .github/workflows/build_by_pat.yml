@@ -1,6 +1,5 @@
 name: Build Nexa By PAT
 
-
 # ============================================================
 # Workflow Trigger
 # ============================================================
@@ -88,11 +87,20 @@ jobs:
 
       # ======================================================
       # 2. Setup Flutter
-      #    Only needed for nexa_commander
+      #
+      # Flutter SDK also provides Dart.
+      #
+      # Therefore this is required for:
+      #
+      #   actions-linux
+      #   actions-windows
+      #   commander-linux
+      #   commander-windows
+      #   commander-android
+      #
       # ======================================================
 
       - name: Setup Flutter
-        if: startsWith(matrix.target, 'commander-')
         uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -100,7 +108,17 @@ jobs:
 
 
       # ======================================================
-      # 3. Setup Python
+      # 3. Show Flutter / Dart versions
+      # ======================================================
+
+      - name: Show Flutter and Dart versions
+        run: |
+          flutter --version
+          dart --version
+
+
+      # ======================================================
+      # 4. Setup Python
       #    Only needed for Windows actions
       # ======================================================
 
@@ -112,7 +130,7 @@ jobs:
 
 
       # ======================================================
-      # 4. Cache pip
+      # 5. Cache pip
       # ======================================================
 
       - name: Cache pip
@@ -124,7 +142,7 @@ jobs:
 
 
       # ======================================================
-      # 5. Install Python build dependencies
+      # 6. Install Python build dependencies
       # ======================================================
 
       - name: Install Python dependencies
@@ -136,44 +154,76 @@ jobs:
 
 
       # ======================================================
-      # 6. Install Dart / Flutter workspace dependencies
+      # 7. Verify Flutter desktop platforms
+      #
+      # Only useful for commander desktop builds.
+      # This makes the error easier to diagnose.
       # ======================================================
+
+      - name: Check Linux project
+        if: matrix.target == 'commander-linux'
+        working-directory: nexa/nexa_commander
+        run: |
+          echo "===== Project files ====="
+          ls -la
+          echo "===== Linux directory ====="
+          if [ -d linux ]; then
+            ls -la linux
+          else
+            echo "ERROR: linux/ directory does not exist."
+            exit 1
+          fi
+
+
+      - name: Check Windows project
+        if: matrix.target == 'commander-windows'
+        working-directory: nexa/nexa_commander
+        shell: pwsh
+        run: |
+          Write-Host "===== Project files ====="
+          Get-ChildItem
+
+          Write-Host "===== Windows directory ====="
+
+          if (Test-Path windows) {
+            Get-ChildItem windows
+          }
+          else {
+            Write-Error "ERROR: windows/ directory does not exist."
+            exit 1
+          }
+
+
+      # ======================================================
+      # 8. Install Dart / Flutter workspace dependencies
       #
       # nexa is a Dart Workspace.
       #
-      # Do NOT create pubspec_overrides.yaml here.
-      # The workspace root already defines all local packages.
+      # No pubspec_overrides.yaml is created.
       #
       # ======================================================
 
       - name: Install workspace dependencies
-        if: matrix.target == 'actions-linux' || matrix.target == 'actions-windows'
-        working-directory: nexa
-        run: |
-          dart pub get
-
-
-      - name: Install Flutter workspace dependencies
-        if: startsWith(matrix.target, 'commander-')
         working-directory: nexa
         run: |
           flutter pub get
 
 
       # ======================================================
-      # 7. Build actions - Linux
+      # 9. Build actions - Linux
       # ======================================================
 
       - name: Build actions Linux
         if: matrix.target == 'actions-linux'
         working-directory: nexa
         run: |
-          dart compile exe actions/bin/actions.dart \
+          dart compile exe \
+            actions/bin/actions.dart \
             -o ../actions-linux
 
 
       # ======================================================
-      # 8. Build actions - Windows
+      # 10. Build actions - Windows
       # ======================================================
 
       - name: Build actions Windows
@@ -181,12 +231,13 @@ jobs:
         working-directory: nexa
         shell: pwsh
         run: |
-          dart compile exe actions/bin/actions.dart `
+          dart compile exe `
+            actions/bin/actions.dart `
             -o ..\actions-windows.exe
 
 
       # ======================================================
-      # 9. Build convert_xls_to_csv.exe
+      # 11. Build convert_xls_to_csv.exe
       # ======================================================
 
       - name: Build convert_xls_to_csv.exe
@@ -205,7 +256,7 @@ jobs:
 
 
       # ======================================================
-      # 10. Build nexa_commander - Linux
+      # 12. Build nexa_commander - Linux
       # ======================================================
 
       - name: Build nexa_commander Linux
@@ -216,11 +267,10 @@ jobs:
 
 
       # ======================================================
-      # 11. Build nexa_commander - Windows
+      # 13. Build nexa_commander - Windows
       # ======================================================
 
       - name: Build nexa_commander Windows
-      # ======================================================
         if: matrix.target == 'commander-windows'
         working-directory: nexa/nexa_commander
         run: |
@@ -228,7 +278,7 @@ jobs:
 
 
       # ======================================================
-      # 12. Build nexa_commander - Android
+      # 14. Build nexa_commander - Android
       # ======================================================
 
       - name: Build nexa_commander Android
@@ -239,7 +289,7 @@ jobs:
 
 
       # ======================================================
-      # 13. Prepare actions Linux artifact
+      # 15. Prepare actions Linux artifact
       # ======================================================
 
       - name: Prepare actions Linux artifact
@@ -253,7 +303,7 @@ jobs:
 
 
       # ======================================================
-      # 14. Prepare actions Windows artifact
+      # 16. Prepare actions Windows artifact
       # ======================================================
 
       - name: Prepare actions Windows artifact
@@ -273,7 +323,7 @@ jobs:
 
 
       # ======================================================
-      # 15. Prepare commander Linux artifact
+      # 17. Prepare commander Linux artifact
       # ======================================================
 
       - name: Prepare commander Linux artifact
@@ -287,7 +337,7 @@ jobs:
 
 
       # ======================================================
-      # 16. Prepare commander Windows artifact
+      # 18. Prepare commander Windows artifact
       # ======================================================
 
       - name: Prepare commander Windows artifact
@@ -304,7 +354,7 @@ jobs:
 
 
       # ======================================================
-      # 17. Prepare commander Android artifact
+      # 19. Prepare commander Android artifact
       # ======================================================
 
       - name: Prepare commander Android artifact
@@ -318,7 +368,7 @@ jobs:
 
 
       # ======================================================
-      # 18. Upload Matrix artifact
+      # 20. Upload Matrix artifact
       # ======================================================
 
       - name: Upload build artifact
@@ -330,7 +380,7 @@ jobs:
 
 
   # ==========================================================
-  # Package
+  # Package Release
   # ==========================================================
 
   package:
@@ -348,7 +398,7 @@ jobs:
     steps:
 
       # ======================================================
-      # 19. Download all Matrix artifacts
+      # 21. Download all Matrix artifacts
       # ======================================================
 
       - name: Download build artifacts
@@ -358,7 +408,7 @@ jobs:
 
 
       # ======================================================
-      # 20. Display artifact structure
+      # 22. Show artifact structure
       # ======================================================
 
       - name: Show artifact structure
@@ -368,7 +418,7 @@ jobs:
 
 
       # ======================================================
-      # 21. Create release directories
+      # 23. Create release directories
       # ======================================================
 
       - name: Prepare release directories
@@ -378,7 +428,7 @@ jobs:
 
 
       # ======================================================
-      # 22. Assemble nexa-actions
+      # 24. Assemble nexa-actions
       # ======================================================
 
       - name: Assemble nexa-actions
@@ -401,7 +451,7 @@ jobs:
 
 
       # ======================================================
-      # 23. Assemble nexa-commander
+      # 25. Assemble nexa-commander
       # ======================================================
 
       - name: Assemble nexa-commander
@@ -425,7 +475,7 @@ jobs:
 
 
       # ======================================================
-      # 24. Show final release structure
+      # 26. Show final release structure
       # ======================================================
 
       - name: Show final release structure
@@ -435,7 +485,7 @@ jobs:
 
 
       # ======================================================
-      # 25. Create nexa-actions.zip
+      # 27. Create nexa-actions.zip
       # ======================================================
 
       - name: Create nexa-actions.zip
@@ -448,7 +498,7 @@ jobs:
 
 
       # ======================================================
-      # 26. Create nexa-commander.zip
+      # 28. Create nexa-commander.zip
       # ======================================================
 
       - name: Create nexa-commander.zip
@@ -461,7 +511,7 @@ jobs:
 
 
       # ======================================================
-      # 27. Create GitHub Release
+      # 29. Create GitHub Release
       # ======================================================
 
       - name: Create GitHub Release
