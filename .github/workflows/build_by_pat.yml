@@ -104,7 +104,23 @@ jobs:
 
 
       # ======================================================
-      # 2.2 Enable Windows desktop
+      # 2.2 Install Linux desktop dependencies
+      # ======================================================
+
+      - name: Install Linux desktop dependencies
+        if: matrix.target == 'commander-linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev
+
+
+      # ======================================================
+      # 2.3 Enable Windows desktop
       # ======================================================
 
       - name: Enable Windows desktop
