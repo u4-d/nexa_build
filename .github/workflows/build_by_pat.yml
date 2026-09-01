@@ -75,6 +75,7 @@ jobs:
           path: nexa
           fetch-depth: 1
 
+
       # ======================================================
       # 2. Setup Flutter
       #
@@ -120,6 +121,7 @@ jobs:
         run: |
           flutter --version
           dart --version
+
 
       # ======================================================
       # 4. Setup Python
@@ -169,6 +171,9 @@ jobs:
           echo "===== Flutter ====="
           flutter --version
 
+          echo "===== Flutter config ====="
+          flutter config
+
           echo "===== Project ====="
           ls -la
 
@@ -195,6 +200,9 @@ jobs:
         run: |
           Write-Host "===== Flutter ====="
           flutter --version
+
+          Write-Host "===== Flutter config ====="
+          flutter config
 
           Write-Host "===== Project ====="
           Get-ChildItem
@@ -272,7 +280,12 @@ jobs:
 
 
       # ======================================================
-      # 13. Ensure and build nexa_commander - Linux
+      # 13. Ensure Linux desktop project
+      #
+      # The source repository already contains linux/.
+      #
+      # flutter create makes sure the CI environment has
+      # a valid Linux Flutter desktop project.
       # ======================================================
 
       - name: Ensure Linux desktop project
@@ -282,6 +295,11 @@ jobs:
           flutter config --enable-linux-desktop
           flutter create . --platforms=linux
 
+
+      # ======================================================
+      # 14. Build nexa_commander - Linux
+      # ======================================================
+
       - name: Build nexa_commander Linux
         if: matrix.target == 'commander-linux'
         working-directory: nexa/nexa_commander
@@ -290,7 +308,12 @@ jobs:
 
 
       # ======================================================
-      # 14. Ensure and build nexa_commander - Windows
+      # 15. Ensure Windows desktop project
+      #
+      # The source repository already contains windows/.
+      #
+      # flutter create makes sure the CI environment has
+      # a valid Windows Flutter desktop project.
       # ======================================================
 
       - name: Ensure Windows desktop project
@@ -300,6 +323,11 @@ jobs:
           flutter config --enable-windows-desktop
           flutter create . --platforms=windows
 
+
+      # ======================================================
+      # 16. Build nexa_commander - Windows
+      # ======================================================
+
       - name: Build nexa_commander Windows
         if: matrix.target == 'commander-windows'
         working-directory: nexa/nexa_commander
@@ -308,7 +336,7 @@ jobs:
 
 
       # ======================================================
-      # 15. Build nexa_commander - Android
+      # 17. Build nexa_commander - Android
       # ======================================================
 
       - name: Build nexa_commander Android
@@ -319,7 +347,7 @@ jobs:
 
 
       # ======================================================
-      # 16. Prepare actions Linux artifact
+      # 18. Prepare actions Linux artifact
       # ======================================================
 
       - name: Prepare actions Linux artifact
@@ -333,7 +361,7 @@ jobs:
 
 
       # ======================================================
-      # 17. Prepare actions Windows artifact
+      # 19. Prepare actions Windows artifact
       # ======================================================
 
       - name: Prepare actions Windows artifact
@@ -353,7 +381,7 @@ jobs:
 
 
       # ======================================================
-      # 18. Prepare commander Linux artifact
+      # 20. Prepare commander Linux artifact
       # ======================================================
 
       - name: Prepare commander Linux artifact
@@ -367,7 +395,7 @@ jobs:
 
 
       # ======================================================
-      # 19. Prepare commander Windows artifact
+      # 21. Prepare commander Windows artifact
       # ======================================================
 
       - name: Prepare commander Windows artifact
@@ -384,7 +412,7 @@ jobs:
 
 
       # ======================================================
-      # 20. Prepare commander Android artifact
+      # 22. Prepare commander Android artifact
       # ======================================================
 
       - name: Prepare commander Android artifact
@@ -398,7 +426,7 @@ jobs:
 
 
       # ======================================================
-      # 21. Upload Matrix artifact
+      # 23. Upload Matrix artifact
       # ======================================================
 
       - name: Upload build artifact
@@ -428,7 +456,7 @@ jobs:
     steps:
 
       # ======================================================
-      # 22. Download all build artifacts
+      # 24. Download all build artifacts
       # ======================================================
 
       - name: Download build artifacts
@@ -438,7 +466,7 @@ jobs:
 
 
       # ======================================================
-      # 23. Show artifacts
+      # 25. Show artifacts
       # ======================================================
 
       - name: Show artifact structure
@@ -448,7 +476,7 @@ jobs:
 
 
       # ======================================================
-      # 24. Prepare release directories
+      # 26. Prepare release directories
       # ======================================================
 
       - name: Prepare release directories
@@ -458,7 +486,7 @@ jobs:
 
 
       # ======================================================
-      # 25. Assemble nexa-actions
+      # 27. Assemble nexa-actions
       # ======================================================
 
       - name: Assemble nexa-actions
@@ -481,7 +509,7 @@ jobs:
 
 
       # ======================================================
-      # 26. Assemble nexa-commander
+      # 28. Assemble nexa-commander
       # ======================================================
 
       - name: Assemble nexa-commander
@@ -505,7 +533,7 @@ jobs:
 
 
       # ======================================================
-      # 27. Show final release structure
+      # 29. Show final release structure
       # ======================================================
 
       - name: Show final release structure
@@ -515,7 +543,7 @@ jobs:
 
 
       # ======================================================
-      # 28. Create nexa-actions.zip
+      # 30. Create nexa-actions.zip
       # ======================================================
 
       - name: Create nexa-actions.zip
@@ -528,7 +556,7 @@ jobs:
 
 
       # ======================================================
-      # 29. Create nexa-commander.zip
+      # 31. Create nexa-commander.zip
       # ======================================================
 
       - name: Create nexa-commander.zip
@@ -541,7 +569,7 @@ jobs:
 
 
       # ======================================================
-      # 30. Create GitHub Release
+      # 32. Create GitHub Release
       # ======================================================
 
       - name: Create GitHub Release
