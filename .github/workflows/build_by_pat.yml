@@ -75,7 +75,6 @@ jobs:
           path: nexa
           fetch-depth: 1
 
-
       # ======================================================
       # 2. Setup Flutter
       #
@@ -94,14 +93,33 @@ jobs:
 
 
       # ======================================================
-      # 3. Show versions
+      # 2.1 Enable Linux desktop
+      # ======================================================
+
+      - name: Enable Linux desktop
+        if: matrix.target == 'commander-linux'
+        run: |
+          flutter config --enable-linux-desktop
+
+
+      # ======================================================
+      # 2.2 Enable Windows desktop
+      # ======================================================
+
+      - name: Enable Windows desktop
+        if: matrix.target == 'commander-windows'
+        run: |
+          flutter config --enable-windows-desktop
+
+
+      # ======================================================
+      # 3. Show Flutter and Dart versions
       # ======================================================
 
       - name: Show Flutter and Dart versions
         run: |
           flutter --version
           dart --version
-
 
       # ======================================================
       # 4. Setup Python
@@ -254,8 +272,15 @@ jobs:
 
 
       # ======================================================
-      # 13. Build nexa_commander - Linux
+      # 13. Ensure and build nexa_commander - Linux
       # ======================================================
+
+      - name: Ensure Linux desktop project
+        if: matrix.target == 'commander-linux'
+        working-directory: nexa/nexa_commander
+        run: |
+          flutter config --enable-linux-desktop
+          flutter create . --platforms=linux
 
       - name: Build nexa_commander Linux
         if: matrix.target == 'commander-linux'
@@ -265,8 +290,15 @@ jobs:
 
 
       # ======================================================
-      # 14. Build nexa_commander - Windows
+      # 14. Ensure and build nexa_commander - Windows
       # ======================================================
+
+      - name: Ensure Windows desktop project
+        if: matrix.target == 'commander-windows'
+        working-directory: nexa/nexa_commander
+        run: |
+          flutter config --enable-windows-desktop
+          flutter create . --platforms=windows
 
       - name: Build nexa_commander Windows
         if: matrix.target == 'commander-windows'
