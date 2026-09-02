@@ -586,26 +586,21 @@ jobs:
       # 31. Create nexa-actions.zip
       # ======================================================
 
-      - name: Create nexa-actions.zip
+      - name: Create encrypted nexa-actions.zip
         run: |
+          sudo apt-get update && sudo apt-get install -y p7zip-full
           cd release
-
-          zip -r \
-            ../nexa-actions.zip \
-            nexa-actions
+          7z a -tzip -p"${{ secrets.ARCHIVE_PASSWORD }}" ../nexa-actions.zip nexa-actions
 
 
       # ======================================================
       # 32. Create nexa-commander.zip
       # ======================================================
 
-      - name: Create nexa-commander.zip
+      - name: Create encrypted nexa-commander.zip
         run: |
           cd release
-
-          zip -r \
-            ../nexa-commander.zip \
-            nexa-commander
+          7z a -tzip -p"${{ secrets.ARCHIVE_PASSWORD }}" ../nexa-commander.zip nexa-commander
 
 
       # ======================================================
