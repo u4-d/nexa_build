@@ -426,25 +426,24 @@ jobs:
 
 
       # ======================================================
-      # 31. Create nexa-actions.zip (With ARCHIVE_PASSWORD Encryption)
+      # 31. Create nexa-actions.zip
       # ======================================================
 
       - name: Create encrypted nexa-actions.zip
         run: |
           sudo apt-get update && sudo apt-get install -y p7zip-full
           cd release
-          # 使用 7z 创建标准 zip 并通过环境变量加密，-mhe=on 可以把文件名也加密
-          7z a -tzip -p"${{ secrets.ARCHIVE_PASSWORD }}" -mhe=on ../nexa-actions.zip nexa-actions
+          7z a -tzip -p"${{ secrets.ARCHIVE_PASSWORD }}" ../nexa-actions.zip nexa-actions
 
 
       # ======================================================
-      # 32. Create nexa-commander.zip (With ARCHIVE_PASSWORD Encryption)
+      # 32. Create nexa-commander.zip
       # ======================================================
 
       - name: Create encrypted nexa-commander.zip
         run: |
           cd release
-          7z a -tzip -p"${{ secrets.ARCHIVE_PASSWORD }}" -mhe=on ../nexa-commander.zip nexa-commander
+          7z a -tzip -p"${{ secrets.ARCHIVE_PASSWORD }}" ../nexa-commander.zip nexa-commander
 
 
       # ======================================================
