@@ -69,6 +69,12 @@ jobs:
 
       # ======================================================
       # 1. Generate GitHub App installation token
+      #
+      # Nexa Build App
+      # App ID: 4798967
+      #
+      # The token is temporary and scoped to:
+      # u4-d/nexa
       # ======================================================
 
       - name: Generate GitHub App token
@@ -96,6 +102,11 @@ jobs:
 
       # ======================================================
       # 3. Setup Flutter
+      #
+      # Flutter 3.44.9
+      # Dart 3.12.2
+      #
+      # Same as local development environment.
       # ======================================================
 
       - name: Setup Flutter
@@ -154,6 +165,8 @@ jobs:
 
       # ======================================================
       # 5. Setup Python
+      #
+      # Only required by Windows actions.
       # ======================================================
 
       - name: Setup Python
@@ -197,6 +210,21 @@ jobs:
         run: |
           echo "===== Flutter ====="
           flutter --version
+
+          echo "===== Flutter config ====="
+          flutter config
+
+          echo "===== Project ====="
+          ls -la
+
+          echo "===== Linux ====="
+          ls -la linux
+          ls -la linux/flutter
+          ls -la linux/runner
+
+          echo "===== Git files ====="
+          git ls-files linux/
+
           echo "===== Flutter devices ====="
           flutter devices
 
@@ -212,12 +240,31 @@ jobs:
         run: |
           Write-Host "===== Flutter ====="
           flutter --version
+
+          Write-Host "===== Flutter config ====="
+          flutter config
+
+          Write-Host "===== Project ====="
+          Get-ChildItem
+
+          Write-Host "===== Windows ====="
+          Get-ChildItem windows
+          Get-ChildItem windows\flutter
+          Get-ChildItem windows\runner
+
+          Write-Host "===== Git files ====="
+          git ls-files windows\
+
           Write-Host "===== Flutter devices ====="
           flutter devices
 
 
       # ======================================================
       # 10. Get dependencies
+      #
+      # nexa is a Dart/Flutter Workspace.
+      #
+      # No pubspec_overrides.yaml.
       # ======================================================
 
       - name: Get workspace dependencies
@@ -274,6 +321,11 @@ jobs:
 
       # ======================================================
       # 14. Ensure Linux desktop project
+      #
+      # The source repository already contains linux/.
+      #
+      # flutter create makes sure the CI environment has
+      # a valid Linux Flutter desktop project.
       # ======================================================
 
       - name: Ensure Linux desktop project
@@ -297,6 +349,11 @@ jobs:
 
       # ======================================================
       # 16. Ensure Windows desktop project
+      #
+      # The source repository already contains windows/.
+      #
+      # flutter create makes sure the CI environment has
+      # a valid Windows Flutter desktop project.
       # ======================================================
 
       - name: Ensure Windows desktop project
@@ -330,41 +387,82 @@ jobs:
 
 
       # ======================================================
-      # 19 - 23. Prepare Artifacts
+      # 19. Prepare actions Linux artifact
       # ======================================================
 
       - name: Prepare actions Linux artifact
         if: matrix.target == 'actions-linux'
         run: |
           mkdir -p artifact/linux
-          cp actions-linux artifact/linux/actions
+
+          cp \
+            actions-linux \
+            artifact/linux/actions
+
+
+      # ======================================================
+      # 20. Prepare actions Windows artifact
+      # ======================================================
 
       - name: Prepare actions Windows artifact
         if: matrix.target == 'actions-windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force artifact\windows
-          Copy-Item actions-windows.exe artifact\windows\actions.exe
-          Copy-Item convert_xls_to_csv.exe artifact\windows\convert_xls_to_csv.exe
+          New-Item -ItemType Directory -Force `
+            artifact\windows
+
+          Copy-Item `
+            actions-windows.exe `
+            artifact\windows\actions.exe
+
+          Copy-Item `
+            convert_xls_to_csv.exe `
+            artifact\windows\convert_xls_to_csv.exe
+
+
+      # ======================================================
+      # 21. Prepare commander Linux artifact
+      # ======================================================
 
       - name: Prepare commander Linux artifact
         if: matrix.target == 'commander-linux'
         run: |
           mkdir -p artifact/linux/nexa_commander
-          cp -R nexa/nexa_commander/build/linux/x64/release/bundle/* artifact/linux/nexa_commander/
+
+          cp -R \
+            nexa/nexa_commander/build/linux/x64/release/bundle/* \
+            artifact/linux/nexa_commander/
+
+
+      # ======================================================
+      # 22. Prepare commander Windows artifact
+      # ======================================================
 
       - name: Prepare commander Windows artifact
         if: matrix.target == 'commander-windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force artifact\windows\nexa_commander
-          Copy-Item nexa\nexa_commander\build\windows\x64\runner\Release\* artifact\windows\nexa_commander\ -Recurse
+          New-Item -ItemType Directory -Force `
+            artifact\windows\nexa_commander
+
+          Copy-Item `
+            nexa\nexa_commander\build\windows\x64\runner\Release\* `
+            artifact\windows\nexa_commander\ `
+            -Recurse
+
+
+      # ======================================================
+      # 23. Prepare commander Android artifact
+      # ======================================================
 
       - name: Prepare commander Android artifact
         if: matrix.target == 'commander-android'
         run: |
           mkdir -p artifact/android
-          cp nexa/nexa_commander/build/app/outputs/flutter-apk/app-release.apk artifact/android/nexa-commander.apk
+
+          cp \
+            nexa/nexa_commander/build/app/outputs/flutter-apk/app-release.apk \
+            artifact/android/nexa-commander.apk
 
 
       # ======================================================
@@ -397,54 +495,117 @@ jobs:
 
     steps:
 
+      # ======================================================
+      # 25. Download all build artifacts
+      # ======================================================
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+
+      # ======================================================
+      # 26. Show artifacts
+      # ======================================================
+
+      - name: Show artifact structure
+        run: |
+          echo "===== Artifacts ====="
+          find artifacts -print | sort
+
+
+      # ======================================================
+      # 27. Prepare release directories
+      # ======================================================
 
       - name: Prepare release directories
         run: |
           mkdir -p release/nexa-actions
           mkdir -p release/nexa-commander
 
+
+      # ======================================================
+      # 28. Assemble nexa-actions
+      # ======================================================
+
       - name: Assemble nexa-actions
         run: |
+
           mkdir -p release/nexa-actions/linux
           mkdir -p release/nexa-actions/windows
-          cp artifacts/actions-linux/linux/actions release/nexa-actions/linux/actions
-          cp artifacts/actions-windows/windows/actions.exe release/nexa-actions/windows/actions.exe
-          cp artifacts/actions-windows/windows/convert_xls_to_csv.exe release/nexa-actions/windows/convert_xls_to_csv.exe
+
+          cp \
+            artifacts/actions-linux/linux/actions \
+            release/nexa-actions/linux/actions
+
+          cp \
+            artifacts/actions-windows/windows/actions.exe \
+            release/nexa-actions/windows/actions.exe
+
+          cp \
+            artifacts/actions-windows/windows/convert_xls_to_csv.exe \
+            release/nexa-actions/windows/convert_xls_to_csv.exe
+
+
+      # ======================================================
+      # 29. Assemble nexa-commander
+      # ======================================================
 
       - name: Assemble nexa-commander
         run: |
+
           mkdir -p release/nexa-commander/linux
           mkdir -p release/nexa-commander/windows
           mkdir -p release/nexa-commander/android
-          cp -R artifacts/commander-linux/linux/nexa_commander release/nexa-commander/linux/
-          cp -R artifacts/commander-windows/windows/nexa_commander release/nexa-commander/windows/
-          cp artifacts/commander-android/android/nexa-commander.apk release/nexa-commander/android/nexa-commander.apk
+
+          cp -R \
+            artifacts/commander-linux/linux/nexa_commander \
+            release/nexa-commander/linux/
+
+          cp -R \
+            artifacts/commander-windows/windows/nexa_commander \
+            release/nexa-commander/windows/
+
+          cp \
+            artifacts/commander-android/android/nexa-commander.apk \
+            release/nexa-commander/android/nexa-commander.apk
 
 
       # ======================================================
-      # 31. Create nexa-actions.zip (With ARCHIVE_PASSWORD Encryption)
+      # 30. Show final release structure
       # ======================================================
 
-      - name: Create encrypted nexa-actions.zip
+      - name: Show final release structure
         run: |
-          sudo apt-get update && sudo apt-get install -y p7zip-full
-          cd release
-          # 使用 7z 创建标准 zip 并通过环境变量加密，-mhe=on 可以把文件名也加密
-          7z a -tzip -p"${{ secrets.ARCHIVE_PASSWORD }}" -mhe=on ../nexa-actions.zip nexa-actions
+          echo "===== Final Release ====="
+          find release -print | sort
 
 
       # ======================================================
-      # 32. Create nexa-commander.zip (With ARCHIVE_PASSWORD Encryption)
+      # 31. Create nexa-actions.zip
       # ======================================================
 
-      - name: Create encrypted nexa-commander.zip
+      - name: Create nexa-actions.zip
         run: |
           cd release
-          7z a -tzip -p"${{ secrets.ARCHIVE_PASSWORD }}" -mhe=on ../nexa-commander.zip nexa-commander
+
+          zip -r \
+            ../nexa-actions.zip \
+            nexa-actions
+
+
+      # ======================================================
+      # 32. Create nexa-commander.zip
+      # ======================================================
+
+      - name: Create nexa-commander.zip
+        run: |
+          cd release
+
+          zip -r \
+            ../nexa-commander.zip \
+            nexa-commander
 
 
       # ======================================================
